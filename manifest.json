@@ -1,0 +1,27 @@
+{
+    "manifest_version": 3,
+    "name": "Dog Run Extension",
+    "version": "1.0",
+    "description": "A dog that runs around your screen on click.",
+    "permissions": [],
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content.js"
+            ]
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "assets/dollar.gif"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ]
+}
