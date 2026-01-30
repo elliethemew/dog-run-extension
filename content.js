@@ -27,16 +27,38 @@
     // 2: Bottom-Left
     // 3: Top-Left
     let currentCorner = 0;
+    let isRunning = false;
     let animation = null;
 
     // 4. Click Handler
     dog.addEventListener('click', () => {
-        moveToNextCorner();
+        if (isRunning) {
+            stopRunning();
+        } else {
+            startRunning();
+        }
     });
 
-    function moveToNextCorner() {
-        // Determine next target
-        const nextCorner = (currentCorner + 1) % 4;
+    function startRunning() {
+        isRunning = true;
+        // If paused in the middle, resume
+        if (animation && animation.playState === 'paused') {
+            animation.play();
+        } else {
+            // Otherwise start the next leg
+            runNextLeg();
+        }
+    }
+
+    function stopRunning() {
+        isRunning = false;
+        if (animation) {
+            animation.pause();
+        }
+    }
+
+    function runNextLeg() {
+        if (!isRunning) return;
 
         const vw = window.innerWidth;
         const vh = window.innerHeight;
@@ -45,46 +67,66 @@
 
         // Calculate max coordinates
         // Origin is Top-Right (0,0)
+        // X is negative (going left)
+        // Y is positive (going down)
         const moveY = vh - dogHeight;
         const moveX = -(vw - dogWidth);
 
-        // Define all coordinates
-        // 0: 0, 0
-        // 1: 0, moveY
-        // 2: moveX, moveY
-        // 3: moveX, 0
+        // Define all coordinates for corners
+        const coords = [
+            { x: 0, y: 0 },         // 0: Top-Right
+            { x: 0, y: moveY },     // 1: Bottom-Right
+            { x: moveX, y: moveY }, // 2: Bottom-Left
+            { x: moveX, y: 0 }      // 3: Top-Left
+        ];
 
-        let targetTransform = '';
+        const nextCorner = (currentCorner + 1) % 4;
+        const startPos = coords[currentCorner];
+        const endPos = coords[nextCorner];
 
-        switch (nextCorner) {
-            case 0: // Top-Right
-                targetTransform = 'translate(0px, 0px)';
+        // Determine Rotation/Scale based on direction
+        let transformSuffix = '';
+        switch (currentCorner) {
+            case 0: // Top-Right -> Bottom-Right (Down)
+                transformSuffix = 'rotate(90deg)';
                 break;
-            case 1: // Bottom-Right
-                targetTransform = `translate(0px, ${moveY}px)`;
+            case 1: // Bottom-Right -> Bottom-Left (Left)
+                transformSuffix = 'scaleX(-1)';
                 break;
-            case 2: // Bottom-Left
-                targetTransform = `translate(${moveX}px, ${moveY}px)`;
+            case 2: // Bottom-Left -> Top-Left (Up)
+                transformSuffix = 'rotate(-90deg)';
                 break;
-            case 3: // Top-Left
-                targetTransform = `translate(${moveX}px, 0px)`;
+            case 3: // Top-Left -> Top-Right (Right)
+                transformSuffix = 'scaleX(1)'; // Reset scale/rotate
                 break;
         }
 
-        // Animate to target
-        // We don't specify start state; it starts from current computed style
+        // Construct transforms
+        // We set the rotation immediately at the start of the leg and keep it constant
+        const startTransform = `translate(${startPos.x}px, ${startPos.y}px) ${transformSuffix}`;
+        const endTransform = `translate(${endPos.x}px, ${endPos.y}px) ${transformSuffix}`;
+
+        // Animate
         animation = dog.animate(
             [
-                { transform: targetTransform }
+                { transform: startTransform },
+                { transform: endTransform }
             ],
             {
-                duration: 2500, // Slower: 2.5s per leg
-                fill: 'forwards', // Stay at destination
-                easing: 'ease-in-out' // Smoother start/stop
+                duration: 2500, // 2.5s per leg
+                fill: 'forwards',
+                easing: 'linear' // Linear movement for running
             }
         );
 
-        // Update state
-        currentCorner = nextCorner;
+        animation.onfinish = () => {
+            // Only update corner state when we actually arrive
+            currentCorner = nextCorner;
+
+            // Loop if still running
+            if (isRunning) {
+                runNextLeg();
+            }
+        };
     }
 })();
