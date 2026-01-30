@@ -1,90 +1,158 @@
 (() => {
-    // 1. Create the dog element
-    const dog = document.createElement('img');
-    dog.src = chrome.runtime.getURL('assets/dollar.gif');
-    dog.id = 'dog-run-extension-img';
+    // Configuration
+    const CONFIG = {
+        image: 'assets/Bluebinh.gif',
+        width: '150px',
+        height: '150px',
+        position: { top: '100px', right: '-150px' }, // Start hidden off-screen
+        peekPosition: { right: '0px' }, // End position (visible)
+        transition: 'right 0.5s ease-in-out',
+        peekDuration: 4000, // How long to stay visible
+        minInterval: 5000,  // Minimum time between peeks
+        maxInterval: 15000  // Maximum time between peeks
+    };
 
-    // 2. Style it deeply to avoid page conflicts
-    Object.assign(dog.style, {
+    // 1. Create the container
+    const container = document.createElement('div');
+    container.id = 'dog-run-extension-container';
+
+    Object.assign(container.style, {
         position: 'fixed',
-        top: '0px',
-        right: '0px',
-        width: '100px', // Adjust size as needed
-        height: 'auto',
-        zIndex: '2147483647', // Max z-index
+        top: CONFIG.position.top,
+        right: CONFIG.position.right,
+        width: CONFIG.width,
+        height: CONFIG.height,
+        zIndex: '2147483647',
         cursor: 'pointer',
-        userSelect: 'none',
+        transition: CONFIG.transition,
         pointerEvents: 'auto'
     });
 
-    // Append to documentElement (<html>) to avoid body overflow issues
-    (document.documentElement || document.body).appendChild(dog);
-    console.log('Dog Run Extension: Injected element');
+    // 2. Create the character image
+    const charImg = document.createElement('img');
+    charImg.src = chrome.runtime.getURL(CONFIG.image);
+    charImg.id = 'dog-run-extension-img';
 
-    // 3. State
-    // 0: Top-Right (Start)
-    // 1: Bottom-Right
-    // 2: Bottom-Left
-    // 3: Top-Left
-    let currentCorner = 0;
-    let animation = null;
-
-    // 4. Click Handler
-    dog.addEventListener('click', () => {
-        moveToNextCorner();
+    Object.assign(charImg.style, {
+        width: '100%',
+        height: 'auto',
+        display: 'block',
+        pointerEvents: 'none'
     });
 
-    function moveToNextCorner() {
-        // Determine next target
-        const nextCorner = (currentCorner + 1) % 4;
+    // 3. Create the speech bubble
+    const bubble = document.createElement('div');
+    bubble.id = 'dog-run-extension-bubble';
+    Object.assign(bubble.style, {
+        position: 'absolute',
+        bottom: '80%', // Position above the character
+        right: '100%', // To the left of the character
+        marginRight: '-20px', // Overlap slightly
+        padding: '8px 12px',
+        backgroundColor: 'white',
+        color: 'black',
+        borderRadius: '12px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+        fontFamily: 'sans-serif',
+        fontSize: '14px',
+        fontWeight: 'bold',
+        whiteSpace: 'nowrap',
+        pointerEvents: 'none',
+        opacity: '0',
+        transition: 'opacity 0.3s',
+        zIndex: '2147483648'
+    });
 
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const dogWidth = dog.offsetWidth || 100;
-        const dogHeight = dog.offsetHeight || 100;
+    // Bubble tail
+    const tail = document.createElement('div');
+    Object.assign(tail.style, {
+        position: 'absolute',
+        bottom: '10px',
+        right: '-6px',
+        width: '0',
+        height: '0',
+        borderTop: '6px solid transparent',
+        borderBottom: '6px solid transparent',
+        borderLeft: '6px solid white'
+    });
+    bubble.appendChild(tail);
 
-        // Calculate max coordinates
-        // Origin is Top-Right (0,0)
-        const moveY = vh - dogHeight;
-        const moveX = -(vw - dogWidth);
+    container.appendChild(charImg);
+    container.appendChild(bubble);
+    (document.documentElement || document.body).appendChild(container);
+    console.log('Dog Run Extension: Peeking Character Injected');
 
-        // Define all coordinates
-        // 0: 0, 0
-        // 1: 0, moveY
-        // 2: moveX, moveY
-        // 3: moveX, 0
+    // Phrases
+    const phrases = [
+        "Hello there!", "Peek-a-boo!",
+        "Working hard?", "Take a break!",
+        "What's this?", "I'm watching!",
+        "Coding?", "Zoom zoom!"
+    ];
 
-        let targetTransform = '';
+    let isPeeking = false;
+    let peekTimeout = null;
 
-        switch (nextCorner) {
-            case 0: // Top-Right
-                targetTransform = 'translate(0px, 0px)';
-                break;
-            case 1: // Bottom-Right
-                targetTransform = `translate(0px, ${moveY}px)`;
-                break;
-            case 2: // Bottom-Left
-                targetTransform = `translate(${moveX}px, ${moveY}px)`;
-                break;
-            case 3: // Top-Left
-                targetTransform = `translate(${moveX}px, 0px)`;
-                break;
-        }
+    function showSpeechBubble() {
+        // Pick random phrase
+        const text = phrases[Math.floor(Math.random() * phrases.length)];
 
-        // Animate to target
-        // We don't specify start state; it starts from current computed style
-        animation = dog.animate(
-            [
-                { transform: targetTransform }
-            ],
-            {
-                duration: 2500, // Slower: 2.5s per leg
-                fill: 'forwards', // Stay at destination
-                easing: 'ease-in-out' // Smoother start/stop
-            }
-        );
+        // Reset content to just tail
+        bubble.innerHTML = '';
+        bubble.appendChild(tail);
+        // Add text node
+        bubble.appendChild(document.createTextNode(text));
 
-        // Update state
-        currentCorner = nextCorner;
+        // Show
+        bubble.style.opacity = '1';
+
+        // Hide after 2.5s
+        setTimeout(() => {
+            bubble.style.opacity = '0';
+        }, 2500);
     }
+
+    function peek() {
+        if (isPeeking) return;
+        isPeeking = true;
+
+        // Slide In
+        container.style.right = CONFIG.peekPosition.right;
+
+        // Maybe show bubble after a delay
+        setTimeout(() => {
+            if (Math.random() > 0.3) {
+                showSpeechBubble();
+            }
+        }, 500);
+
+        // Slide Out after duration
+        setTimeout(() => {
+            container.style.right = CONFIG.position.right;
+            isPeeking = false;
+            scheduleNextPeek();
+        }, CONFIG.peekDuration);
+    }
+
+    function scheduleNextPeek() {
+        const interval = Math.random() * (CONFIG.maxInterval - CONFIG.minInterval) + CONFIG.minInterval;
+        peekTimeout = setTimeout(peek, interval);
+    }
+
+    // Initial schedule
+    scheduleNextPeek();
+
+    // Click handler to manually peek or hide
+    container.addEventListener('click', () => {
+        if (isPeeking) {
+            // If clicked while peeking, maybe say something else or hide immediately?
+            // Let's just say something else
+            showSpeechBubble();
+        } else {
+            // Force peek
+            if (peekTimeout) clearTimeout(peekTimeout);
+            peek();
+        }
+    });
+
 })();
