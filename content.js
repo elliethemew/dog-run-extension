@@ -1,32 +1,43 @@
 (() => {
+    // Configuration
+    const CONFIG = {
+        image: 'assets/Bluebinh.gif',
+        width: '150px',
+        height: '150px',
+        position: { top: '100px', right: '-150px' }, // Start hidden off-screen
+        peekPosition: { right: '0px' }, // End position (visible)
+        transition: 'right 0.5s ease-in-out',
+        peekDuration: 4000, // How long to stay visible
+        minInterval: 5000,  // Minimum time between peeks
+        maxInterval: 15000  // Maximum time between peeks
+    };
+
     // 1. Create the container
     const container = document.createElement('div');
     container.id = 'dog-run-extension-container';
 
-    // Style the container (it handles position and movement)
     Object.assign(container.style, {
         position: 'fixed',
-        top: '0px',
-        right: '0px',
-        width: '100px', // Match dog size
-        height: '100px', // Match dog size (approx)
+        top: CONFIG.position.top,
+        right: CONFIG.position.right,
+        width: CONFIG.width,
+        height: CONFIG.height,
         zIndex: '2147483647',
         cursor: 'pointer',
-        userSelect: 'none',
-        pointerEvents: 'auto' // Container captures clicks
+        transition: CONFIG.transition,
+        pointerEvents: 'auto'
     });
 
-    // 2. Create the dog element
-    const dog = document.createElement('img');
-    dog.src = chrome.runtime.getURL('assets/dollar.gif');
-    dog.id = 'dog-run-extension-img';
+    // 2. Create the character image
+    const charImg = document.createElement('img');
+    charImg.src = chrome.runtime.getURL(CONFIG.image);
+    charImg.id = 'dog-run-extension-img';
 
-    // Style the dog (it handles rotation/scale inside the container)
-    Object.assign(dog.style, {
+    Object.assign(charImg.style, {
         width: '100%',
         height: 'auto',
         display: 'block',
-        pointerEvents: 'none' // Click passes through to container
+        pointerEvents: 'none'
     });
 
     // 3. Create the speech bubble
@@ -34,10 +45,9 @@
     bubble.id = 'dog-run-extension-bubble';
     Object.assign(bubble.style, {
         position: 'absolute',
-        bottom: '100%', // Above the dog
-        right: '50%',   // Centered horizontally relative to dog
-        transform: 'translateX(50%)',
-        marginBottom: '10px',
+        bottom: '80%', // Position above the character
+        right: '100%', // To the left of the character
+        marginRight: '-20px', // Overlap slightly
         padding: '8px 12px',
         backgroundColor: 'white',
         color: 'black',
@@ -49,52 +59,44 @@
         whiteSpace: 'nowrap',
         pointerEvents: 'none',
         opacity: '0',
-        transition: 'opacity 0.3s'
+        transition: 'opacity 0.3s',
+        zIndex: '2147483648'
     });
 
     // Bubble tail
     const tail = document.createElement('div');
     Object.assign(tail.style, {
         position: 'absolute',
-        bottom: '-6px',
-        left: '50%',
-        transform: 'translateX(-50%)',
+        bottom: '10px',
+        right: '-6px',
         width: '0',
         height: '0',
-        borderLeft: '6px solid transparent',
-        borderRight: '6px solid transparent',
-        borderTop: '6px solid white'
+        borderTop: '6px solid transparent',
+        borderBottom: '6px solid transparent',
+        borderLeft: '6px solid white'
     });
     bubble.appendChild(tail);
 
-    container.appendChild(dog);
+    container.appendChild(charImg);
     container.appendChild(bubble);
     (document.documentElement || document.body).appendChild(container);
-    console.log('Dog Run Extension: Injected container and element');
-
-    // 3. State
-    // 0: Top-Right (Start)
-    // 1: Bottom-Right
-    // 2: Bottom-Left
-    // 3: Top-Left
-    let currentCorner = 0;
-    let isRunning = false;
-    let animation = null;
+    console.log('Dog Run Extension: Peeking Character Injected');
 
     // Phrases
     const phrases = [
-        "Woof!", "Zoom!", "Catch me!",
-        "Such speed!", "Wow!", "Bark!",
-        "Too fast!", "Running!"
+        "Hello there!", "Peek-a-boo!",
+        "Working hard?", "Take a break!",
+        "What's this?", "I'm watching!",
+        "Coding?", "Zoom zoom!"
     ];
 
-    function showSpeechBubble() {
-        if (!isRunning) return;
+    let isPeeking = false;
+    let peekTimeout = null;
 
+    function showSpeechBubble() {
         // Pick random phrase
         const text = phrases[Math.floor(Math.random() * phrases.length)];
 
-        // Update text (avoid overwriting tail)
         // Reset content to just tail
         bubble.innerHTML = '';
         bubble.appendChild(tail);
@@ -104,118 +106,53 @@
         // Show
         bubble.style.opacity = '1';
 
-        // Hide after 1.5s
+        // Hide after 2.5s
         setTimeout(() => {
             bubble.style.opacity = '0';
-        }, 1500);
+        }, 2500);
     }
 
-    // 4. Click Handler (on container)
+    function peek() {
+        if (isPeeking) return;
+        isPeeking = true;
+
+        // Slide In
+        container.style.right = CONFIG.peekPosition.right;
+
+        // Maybe show bubble after a delay
+        setTimeout(() => {
+            if (Math.random() > 0.3) {
+                showSpeechBubble();
+            }
+        }, 500);
+
+        // Slide Out after duration
+        setTimeout(() => {
+            container.style.right = CONFIG.position.right;
+            isPeeking = false;
+            scheduleNextPeek();
+        }, CONFIG.peekDuration);
+    }
+
+    function scheduleNextPeek() {
+        const interval = Math.random() * (CONFIG.maxInterval - CONFIG.minInterval) + CONFIG.minInterval;
+        peekTimeout = setTimeout(peek, interval);
+    }
+
+    // Initial schedule
+    scheduleNextPeek();
+
+    // Click handler to manually peek or hide
     container.addEventListener('click', () => {
-        if (isRunning) {
-            stopRunning();
+        if (isPeeking) {
+            // If clicked while peeking, maybe say something else or hide immediately?
+            // Let's just say something else
+            showSpeechBubble();
         } else {
-            startRunning();
+            // Force peek
+            if (peekTimeout) clearTimeout(peekTimeout);
+            peek();
         }
     });
 
-    function startRunning() {
-        isRunning = true;
-        // If paused in the middle, resume
-        if (animation && animation.playState === 'paused') {
-            animation.play();
-        } else {
-            // Otherwise start the next leg
-            runNextLeg();
-        }
-    }
-
-    function stopRunning() {
-        isRunning = false;
-        if (animation) {
-            animation.pause();
-        }
-        // Hide bubble if showing
-        bubble.style.opacity = '0';
-    }
-
-    function runNextLeg() {
-        if (!isRunning) return;
-
-        // Maybe show bubble? 30% chance per leg start
-        if (Math.random() > 0.7) {
-            showSpeechBubble();
-        }
-
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const width = container.offsetWidth || 100;
-        const height = container.offsetHeight || 100;
-
-        // Calculate max coordinates
-        // Origin is Top-Right (0,0)
-        // X is negative (going left)
-        // Y is positive (going down)
-        const moveY = vh - height;
-        const moveX = -(vw - width);
-
-        // Define all coordinates for corners
-        const coords = [
-            { x: 0, y: 0 },         // 0: Top-Right
-            { x: 0, y: moveY },     // 1: Bottom-Right
-            { x: moveX, y: moveY }, // 2: Bottom-Left
-            { x: moveX, y: 0 }      // 3: Top-Left
-        ];
-
-        const nextCorner = (currentCorner + 1) % 4;
-        const startPos = coords[currentCorner];
-        const endPos = coords[nextCorner];
-
-        // Determine Rotation/Scale based on direction
-        let dogTransform = '';
-        switch (currentCorner) {
-            case 0: // Top-Right -> Bottom-Right (Down)
-                dogTransform = 'rotate(90deg)';
-                break;
-            case 1: // Bottom-Right -> Bottom-Left (Left)
-                dogTransform = 'scaleX(-1)';
-                break;
-            case 2: // Bottom-Left -> Top-Left (Up)
-                dogTransform = 'rotate(-90deg)';
-                break;
-            case 3: // Top-Left -> Top-Right (Right)
-                dogTransform = 'scaleX(1)'; // Reset scale/rotate
-                break;
-        }
-
-        // Apply rotation to the dog image immediately
-        dog.style.transform = dogTransform;
-
-        // Construct transforms for the container (movement only)
-        const startTransform = `translate(${startPos.x}px, ${startPos.y}px)`;
-        const endTransform = `translate(${endPos.x}px, ${endPos.y}px)`;
-
-        // Animate container
-        animation = container.animate(
-            [
-                { transform: startTransform },
-                { transform: endTransform }
-            ],
-            {
-                duration: 2500, // 2.5s per leg
-                fill: 'forwards',
-                easing: 'linear'
-            }
-        );
-
-        animation.onfinish = () => {
-            // Only update corner state when we actually arrive
-            currentCorner = nextCorner;
-
-            // Loop if still running
-            if (isRunning) {
-                runNextLeg();
-            }
-        };
-    }
 })();
