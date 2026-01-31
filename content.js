@@ -52,6 +52,12 @@
 
     // Helper to update src and size
     function updateImage(filename) {
+        if (filename === 'none') {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block'; // Ensure it's visible if not 'none'
         dog.src = chrome.runtime.getURL(`assets/${filename}`);
 
         // Dynamic sizing based on character
